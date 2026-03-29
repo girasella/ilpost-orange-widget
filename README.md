@@ -4,7 +4,7 @@ An [Orange3](https://orangedatamining.com/) add-on widget for fetching articles,
 
 ## User Interface
 
-![Il Post Orange Widget GUI](image.png)
+![Il Post Orange Widget GUI](https://github.com/girasella/ilpost-orange-widget/raw/master/image.png)
 
 ## Installation
 
