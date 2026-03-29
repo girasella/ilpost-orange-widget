@@ -36,7 +36,7 @@ SORT_ORDER_LABELS = [
 class OWIlPost(OWWidget):
     name = "Il Post"
     description = "Fetch articles from Il Post."
-    icon = "icons/IlPost.svg"
+    icon = "icons/IlPost.jpg"
     priority = 130
     keywords = "il post, articles, italy, italian, newspaper"
 
