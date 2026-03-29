@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orange3-ilpost"
+version = "0.1.0"
+description = "Orange3 widget for fetching articles from Il Post"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Antonio Girasella" }
+]
+requires-python = ">=3.9"
+dependencies = [
+    "Orange3",
+    "orange3-text",
+    "ilpost-api-wrapper",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing",
+]
+
+[project.urls]
+Homepage = "https://github.com/girasella/ilpost-orange-widget"
+Issues = "https://github.com/girasella/ilpost-orange-widget/issues"
+
+[project.entry-points."orange3.addon"]
+ilpost = "orangecontrib.ilpost"
+
+[project.entry-points."orange.widgets"]
+"Il Post" = "orangecontrib.ilpost.widgets"
+
+[tool.setuptools.packages.find]
+include = ["orangecontrib.*"]
