@@ -1,5 +1,5 @@
 from AnyQt.QtCore import Qt
-from AnyQt.QtWidgets import QApplication
+from AnyQt.QtWidgets import QApplication, QCheckBox, QGridLayout, QGroupBox, QVBoxLayout, QWidget
 
 from Orange.data import StringVariable, Domain
 from Orange.widgets.settings import Setting
@@ -8,7 +8,7 @@ from Orange.widgets import gui
 from Orange.widgets.widget import Output
 
 from orangecontrib.text.corpus import Corpus
-from orangecontrib.text.widgets.utils import CheckListLayout, QueryBox, asynchronous
+from orangecontrib.text.widgets.utils import QueryBox, asynchronous
 
 from ilpost import SortOrder, ContentType, DateRange
 from orangecontrib.ilpost.ilpost_api import IlPostAPI, CONTENT_VAR_NAME
@@ -145,17 +145,32 @@ class OWIlPost(OWWidget):
         )
 
         # Text includes features
-        self.controlArea.layout().addWidget(
-            CheckListLayout(
-                "Text includes",
-                self,
-                "text_includes",
-                self.attributes,
-                cols=2,
-                callback=self._on_text_includes_changed,
-            )
-        )
+        text_includes_box = QGroupBox("Text includes")
+        outer = QVBoxLayout()
+        text_includes_box.setLayout(outer)
 
+        self._select_all_cb = QCheckBox("Select All")
+        self._select_all_cb.stateChanged.connect(self._on_select_all_changed)
+        outer.addWidget(self._select_all_cb)
+
+        grid_widget = QWidget()
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid_widget.setLayout(grid)
+        outer.addWidget(grid_widget)
+
+        cols = 2
+        nrows = len(self.attributes) // cols + bool(len(self.attributes) % cols)
+        self._attr_checkboxes = []
+        for i, attr in enumerate(self.attributes):
+            cb = QCheckBox(attr)
+            cb.setChecked(attr in self.text_includes)
+            cb.stateChanged.connect(self._on_attr_checkbox_changed)
+            self._attr_checkboxes.append(cb)
+            grid.addWidget(cb, i % nrows, i // nrows)
+
+        self.controlArea.layout().addWidget(text_includes_box)
+        self._update_select_all_state()
         self._on_text_includes_changed()
 
         # Output
@@ -167,6 +182,35 @@ class OWIlPost(OWWidget):
         self.search_button = gui.button(
             self.button_box, self, "Search", self.start_stop, focusPolicy=Qt.NoFocus
         )
+
+    def _on_attr_checkbox_changed(self):
+        self.text_includes = [
+            attr for attr, cb in zip(self.attributes, self._attr_checkboxes)
+            if cb.isChecked()
+        ]
+        self._update_select_all_state()
+        self._on_text_includes_changed()
+
+    def _on_select_all_changed(self, state):
+        # Block individual checkbox signals to avoid re-entrancy
+        for cb in self._attr_checkboxes:
+            cb.blockSignals(True)
+            cb.setChecked(state == Qt.Checked)
+            cb.blockSignals(False)
+        self.text_includes = list(self.attributes) if state == Qt.Checked else []
+        self._on_text_includes_changed()
+
+    def _update_select_all_state(self):
+        n = len(self.text_includes)
+        self._select_all_cb.blockSignals(True)
+        if n == 0:
+            self._select_all_cb.setCheckState(Qt.Unchecked)
+        elif n == len(self.attributes):
+            self._select_all_cb.setCheckState(Qt.Checked)
+        else:
+            self._select_all_cb.setCheckState(Qt.PartiallyChecked)
+        self._select_all_cb.setTristate(n > 0 and n < len(self.attributes))
+        self._select_all_cb.blockSignals(False)
 
     @property
     def fetch_content(self):
