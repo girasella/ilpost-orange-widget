@@ -26,6 +26,10 @@ class IlPostAPI:
             lambda doc: doc.summary,
         ),
         (
+            partial(StringVariable, "Content"),
+            lambda doc: doc.content or "",
+        ),
+        (
             partial(StringVariable, "Highlight"),
             lambda doc: doc.highlight or "",
         ),
@@ -74,6 +78,7 @@ class IlPostAPI:
         category=None,
         max_documents=100,
         include_paywalled=True,
+        fetch_content=False,
     ):
         self.results = []
         hits = RESULTS_PER_PAGE
@@ -86,6 +91,7 @@ class IlPostAPI:
             content_type=content_type,
             category=category,
             date_range=date_range,
+            fetch_content=fetch_content,
         )
 
         self._collect_docs(first_page.docs, include_paywalled)
@@ -110,6 +116,7 @@ class IlPostAPI:
                 content_type=content_type,
                 category=category,
                 date_range=date_range,
+                fetch_content=fetch_content,
             )
             self._collect_docs(page_result.docs, include_paywalled)
             self.on_progress(len(self.results), min(total, max_documents))

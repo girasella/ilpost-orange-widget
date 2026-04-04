@@ -51,8 +51,11 @@ class OWIlPost(OWWidget):
     date_range_idx = Setting(0)
     sort_order_idx = Setting(0)
     filter_category = Setting("")
+    MAX_DOCUMENTS_WITH_CONTENT = 100
+
     max_documents = Setting(100)
     include_paywalled = Setting(True)
+    fetch_content = Setting(False)
 
     attributes = [
         part.args[0]
@@ -123,7 +126,7 @@ class OWIlPost(OWWidget):
         # Options
         options_box = gui.widgetBox(self.controlArea, "Options")
 
-        gui.spin(
+        self.max_documents_spin = gui.spin(
             options_box,
             self,
             "max_documents",
@@ -139,6 +142,18 @@ class OWIlPost(OWWidget):
             "include_paywalled",
             label="Include paywalled content",
         )
+
+        gui.checkBox(
+            options_box,
+            self,
+            "fetch_content",
+            label="Download full article content (max {})".format(
+                self.MAX_DOCUMENTS_WITH_CONTENT
+            ),
+            callback=self._on_fetch_content_changed,
+        )
+
+        self._on_fetch_content_changed()
 
         # Text includes features
         self.controlArea.layout().addWidget(
@@ -161,6 +176,15 @@ class OWIlPost(OWWidget):
         self.search_button = gui.button(
             self.button_box, self, "Search", self.start_stop, focusPolicy=Qt.NoFocus
         )
+
+    def _on_fetch_content_changed(self):
+        if self.fetch_content:
+            self.max_documents = min(
+                self.max_documents, self.MAX_DOCUMENTS_WITH_CONTENT
+            )
+            self.max_documents_spin.setDisabled(True)
+        else:
+            self.max_documents_spin.setDisabled(False)
 
     def new_query_input(self):
         self.search.stop()
@@ -196,14 +220,21 @@ class OWIlPost(OWWidget):
         _, sort_order = SORT_ORDER_LABELS[self.sort_order_idx]
         category = self.filter_category.strip() or None
 
+        max_docs = (
+            self.MAX_DOCUMENTS_WITH_CONTENT
+            if self.fetch_content
+            else self.max_documents
+        )
+
         return self.api.search(
             self.recent_queries[0],
             content_type=content_type,
             date_range=date_range,
             sort=sort_order,
             category=category,
-            max_documents=self.max_documents,
+            max_documents=max_docs,
             include_paywalled=self.include_paywalled,
+            fetch_content=self.fetch_content,
         )
 
     @search.callback(should_raise=False)
@@ -254,7 +285,8 @@ class OWIlPost(OWWidget):
                 (
                     ("Query", self.recent_queries[0]),
                     ("Content type", content_type.value if content_type else "All"),
-                    ("Max documents", self.max_documents),
+                    ("Max documents", self.MAX_DOCUMENTS_WITH_CONTENT if self.fetch_content else self.max_documents),
+                    ("Download full content", "Yes" if self.fetch_content else "No"),
                     ("Text includes", ", ".join(self.text_includes)),
                     ("Output", self.output_info or "Nothing"),
                 )
