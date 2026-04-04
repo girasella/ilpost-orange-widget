@@ -13,7 +13,7 @@ from ilpost import (
 from orangecontrib.text.util import create_corpus
 
 RESULTS_PER_PAGE = 10
-CONTENT_VAR_NAME = "Content (max 100 articles)"
+CONTENT_VAR_NAME = "Content"
 
 
 class IlPostAPI:

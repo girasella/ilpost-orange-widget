@@ -13,6 +13,8 @@ from orangecontrib.text.widgets.utils import CheckListLayout, QueryBox, asynchro
 from ilpost import SortOrder, ContentType, DateRange
 from orangecontrib.ilpost.ilpost_api import IlPostAPI, CONTENT_VAR_NAME
 
+CONTENT_CHECKBOX_LABEL = "Content (max 100 articles)"
+
 CONTENT_TYPE_LABELS = [
     ("All", None),
     ("Articles", ContentType.ARTICLES),
@@ -57,7 +59,7 @@ class OWIlPost(OWWidget):
     include_paywalled = Setting(True)
 
     attributes = [
-        part.args[0]
+        CONTENT_CHECKBOX_LABEL if part.args[0] == CONTENT_VAR_NAME else part.args[0]
         for part, _ in IlPostAPI.metas
         if part.func is StringVariable
     ]
@@ -168,7 +170,7 @@ class OWIlPost(OWWidget):
 
     @property
     def fetch_content(self):
-        return CONTENT_VAR_NAME in self.text_includes
+        return CONTENT_CHECKBOX_LABEL in self.text_includes
 
     def _on_text_includes_changed(self):
         if self.fetch_content:
@@ -258,11 +260,15 @@ class OWIlPost(OWWidget):
             self.Warning.no_text_fields()
 
         if self.corpus is not None:
-            selected = set(self.text_includes)
+            # Map checkbox labels to actual variable names
+            selected_var_names = {
+                CONTENT_VAR_NAME if label == CONTENT_CHECKBOX_LABEL else label
+                for label in self.text_includes
+            }
             # Keep non-string metas always; filter string metas to selected only
             metas = [
                 var for var in self.corpus.domain.metas
-                if not isinstance(var, StringVariable) or var.name in selected
+                if not isinstance(var, StringVariable) or var.name in selected_var_names
             ]
             domain = Domain(
                 self.corpus.domain.attributes,
@@ -270,7 +276,7 @@ class OWIlPost(OWWidget):
                 metas,
             )
             filtered = self.corpus.from_table(domain, self.corpus)
-            text_vars = [var for var in filtered.domain.metas if var.name in selected]
+            text_vars = [var for var in filtered.domain.metas if var.name in selected_var_names]
             filtered.set_text_features(text_vars or None)
             self.Outputs.corpus.send(filtered)
 
