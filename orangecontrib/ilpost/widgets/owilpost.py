@@ -1,7 +1,7 @@
 from AnyQt.QtCore import Qt
 from AnyQt.QtWidgets import QApplication
 
-from Orange.data import StringVariable
+from Orange.data import StringVariable, Domain
 from Orange.widgets.settings import Setting
 from Orange.widgets.widget import OWWidget, Msg
 from Orange.widgets import gui
@@ -259,13 +259,20 @@ class OWIlPost(OWWidget):
 
         if self.corpus is not None:
             selected = set(self.text_includes)
-            vars_ = [
-                var
-                for var in self.corpus.domain.metas
-                if var.name in selected
+            # Keep non-string metas always; filter string metas to selected only
+            metas = [
+                var for var in self.corpus.domain.metas
+                if not isinstance(var, StringVariable) or var.name in selected
             ]
-            self.corpus.set_text_features(vars_ or None)
-            self.Outputs.corpus.send(self.corpus)
+            domain = Domain(
+                self.corpus.domain.attributes,
+                self.corpus.domain.class_vars,
+                metas,
+            )
+            filtered = self.corpus.from_table(domain, self.corpus)
+            text_vars = [var for var in filtered.domain.metas if var.name in selected]
+            filtered.set_text_features(text_vars or None)
+            self.Outputs.corpus.send(filtered)
 
     def send_report(self):
         if self.corpus:
