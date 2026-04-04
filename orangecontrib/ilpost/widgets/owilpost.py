@@ -11,7 +11,7 @@ from orangecontrib.text.corpus import Corpus
 from orangecontrib.text.widgets.utils import CheckListLayout, QueryBox, asynchronous
 
 from ilpost import SortOrder, ContentType, DateRange
-from orangecontrib.ilpost.ilpost_api import IlPostAPI
+from orangecontrib.ilpost.ilpost_api import IlPostAPI, CONTENT_VAR_NAME
 
 CONTENT_TYPE_LABELS = [
     ("All", None),
@@ -55,7 +55,6 @@ class OWIlPost(OWWidget):
 
     max_documents = Setting(100)
     include_paywalled = Setting(True)
-    fetch_content = Setting(False)
 
     attributes = [
         part.args[0]
@@ -143,18 +142,6 @@ class OWIlPost(OWWidget):
             label="Include paywalled content",
         )
 
-        gui.checkBox(
-            options_box,
-            self,
-            "fetch_content",
-            label="Download full article content (max {})".format(
-                self.MAX_DOCUMENTS_WITH_CONTENT
-            ),
-            callback=self._on_fetch_content_changed,
-        )
-
-        self._on_fetch_content_changed()
-
         # Text includes features
         self.controlArea.layout().addWidget(
             CheckListLayout(
@@ -163,9 +150,11 @@ class OWIlPost(OWWidget):
                 "text_includes",
                 self.attributes,
                 cols=2,
-                callback=self.set_text_features,
+                callback=self._on_text_includes_changed,
             )
         )
+
+        self._on_text_includes_changed()
 
         # Output
         info_box = gui.hBox(self.controlArea, "Output")
@@ -177,7 +166,11 @@ class OWIlPost(OWWidget):
             self.button_box, self, "Search", self.start_stop, focusPolicy=Qt.NoFocus
         )
 
-    def _on_fetch_content_changed(self):
+    @property
+    def fetch_content(self):
+        return CONTENT_VAR_NAME in self.text_includes
+
+    def _on_text_includes_changed(self):
         if self.fetch_content:
             self.max_documents_spin.setMaximum(self.MAX_DOCUMENTS_WITH_CONTENT)
             self.max_documents = min(
@@ -185,6 +178,7 @@ class OWIlPost(OWWidget):
             )
         else:
             self.max_documents_spin.setMaximum(1000)
+        self.set_text_features()
 
     def new_query_input(self):
         self.search.stop()
@@ -260,13 +254,11 @@ class OWIlPost(OWWidget):
 
     def set_text_features(self):
         self.Warning.no_text_fields.clear()
-        if not self.text_includes and not self.fetch_content:
+        if not self.text_includes:
             self.Warning.no_text_fields()
 
         if self.corpus is not None:
             selected = set(self.text_includes)
-            if self.fetch_content:
-                selected.add("Content")
             vars_ = [
                 var
                 for var in self.corpus.domain.metas
