@@ -1,17 +1,19 @@
 from AnyQt.QtCore import Qt
-from AnyQt.QtWidgets import QApplication
+from AnyQt.QtWidgets import QApplication, QCheckBox, QGridLayout, QGroupBox, QVBoxLayout, QWidget
 
-from Orange.data import StringVariable
+from Orange.data import StringVariable, Domain
 from Orange.widgets.settings import Setting
 from Orange.widgets.widget import OWWidget, Msg
 from Orange.widgets import gui
 from Orange.widgets.widget import Output
 
 from orangecontrib.text.corpus import Corpus
-from orangecontrib.text.widgets.utils import CheckListLayout, QueryBox, asynchronous
+from orangecontrib.text.widgets.utils import QueryBox, asynchronous
 
 from ilpost import SortOrder, ContentType, DateRange
-from orangecontrib.ilpost.ilpost_api import IlPostAPI
+from orangecontrib.ilpost.ilpost_api import IlPostAPI, CONTENT_VAR_NAME
+
+CONTENT_CHECKBOX_LABEL = "Content (max 100 articles)"
 
 CONTENT_TYPE_LABELS = [
     ("All", None),
@@ -51,11 +53,13 @@ class OWIlPost(OWWidget):
     date_range_idx = Setting(0)
     sort_order_idx = Setting(0)
     filter_category = Setting("")
+    MAX_DOCUMENTS_WITH_CONTENT = 100
+
     max_documents = Setting(100)
     include_paywalled = Setting(True)
 
     attributes = [
-        part.args[0]
+        CONTENT_CHECKBOX_LABEL if part.args[0] == CONTENT_VAR_NAME else part.args[0]
         for part, _ in IlPostAPI.metas
         if part.func is StringVariable
     ]
@@ -123,13 +127,13 @@ class OWIlPost(OWWidget):
         # Options
         options_box = gui.widgetBox(self.controlArea, "Options")
 
-        gui.spin(
+        self.max_documents_spin = gui.spin(
             options_box,
             self,
             "max_documents",
-            minv=10,
+            minv=1,
             maxv=1000,
-            step=10,
+            step=1,
             label="Max documents:",
         )
 
@@ -141,16 +145,33 @@ class OWIlPost(OWWidget):
         )
 
         # Text includes features
-        self.controlArea.layout().addWidget(
-            CheckListLayout(
-                "Text includes",
-                self,
-                "text_includes",
-                self.attributes,
-                cols=2,
-                callback=self.set_text_features,
-            )
-        )
+        text_includes_box = QGroupBox("Text includes")
+        outer = QVBoxLayout()
+        text_includes_box.setLayout(outer)
+
+        self._select_all_cb = QCheckBox("Select All")
+        self._select_all_cb.stateChanged.connect(self._on_select_all_changed)
+        outer.addWidget(self._select_all_cb)
+
+        grid_widget = QWidget()
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid_widget.setLayout(grid)
+        outer.addWidget(grid_widget)
+
+        cols = 2
+        nrows = len(self.attributes) // cols + bool(len(self.attributes) % cols)
+        self._attr_checkboxes = []
+        for i, attr in enumerate(self.attributes):
+            cb = QCheckBox(attr)
+            cb.setChecked(attr in self.text_includes)
+            cb.stateChanged.connect(self._on_attr_checkbox_changed)
+            self._attr_checkboxes.append(cb)
+            grid.addWidget(cb, i % nrows, i // nrows)
+
+        self.controlArea.layout().addWidget(text_includes_box)
+        self._update_select_all_state()
+        self._on_text_includes_changed()
 
         # Output
         info_box = gui.hBox(self.controlArea, "Output")
@@ -161,6 +182,49 @@ class OWIlPost(OWWidget):
         self.search_button = gui.button(
             self.button_box, self, "Search", self.start_stop, focusPolicy=Qt.NoFocus
         )
+
+    def _on_attr_checkbox_changed(self):
+        self.text_includes = [
+            attr for attr, cb in zip(self.attributes, self._attr_checkboxes)
+            if cb.isChecked()
+        ]
+        self._update_select_all_state()
+        self._on_text_includes_changed()
+
+    def _on_select_all_changed(self, state):
+        # Block individual checkbox signals to avoid re-entrancy
+        for cb in self._attr_checkboxes:
+            cb.blockSignals(True)
+            cb.setChecked(state == Qt.Checked)
+            cb.blockSignals(False)
+        self.text_includes = list(self.attributes) if state == Qt.Checked else []
+        self._on_text_includes_changed()
+
+    def _update_select_all_state(self):
+        n = len(self.text_includes)
+        self._select_all_cb.blockSignals(True)
+        if n == 0:
+            self._select_all_cb.setCheckState(Qt.Unchecked)
+        elif n == len(self.attributes):
+            self._select_all_cb.setCheckState(Qt.Checked)
+        else:
+            self._select_all_cb.setCheckState(Qt.PartiallyChecked)
+        self._select_all_cb.setTristate(n > 0 and n < len(self.attributes))
+        self._select_all_cb.blockSignals(False)
+
+    @property
+    def fetch_content(self):
+        return CONTENT_CHECKBOX_LABEL in self.text_includes
+
+    def _on_text_includes_changed(self):
+        if self.fetch_content:
+            self.max_documents_spin.setMaximum(self.MAX_DOCUMENTS_WITH_CONTENT)
+            self.max_documents = min(
+                self.max_documents, self.MAX_DOCUMENTS_WITH_CONTENT
+            )
+        else:
+            self.max_documents_spin.setMaximum(1000)
+        self.set_text_features()
 
     def new_query_input(self):
         self.search.stop()
@@ -204,6 +268,7 @@ class OWIlPost(OWWidget):
             category=category,
             max_documents=self.max_documents,
             include_paywalled=self.include_paywalled,
+            fetch_content=self.fetch_content,
         )
 
     @search.callback(should_raise=False)
@@ -239,13 +304,25 @@ class OWIlPost(OWWidget):
             self.Warning.no_text_fields()
 
         if self.corpus is not None:
-            vars_ = [
-                var
-                for var in self.corpus.domain.metas
-                if var.name in self.text_includes
+            # Map checkbox labels to actual variable names
+            selected_var_names = {
+                CONTENT_VAR_NAME if label == CONTENT_CHECKBOX_LABEL else label
+                for label in self.text_includes
+            }
+            # Keep non-string metas always; filter string metas to selected only
+            metas = [
+                var for var in self.corpus.domain.metas
+                if not isinstance(var, StringVariable) or var.name in selected_var_names
             ]
-            self.corpus.set_text_features(vars_ or None)
-            self.Outputs.corpus.send(self.corpus)
+            domain = Domain(
+                self.corpus.domain.attributes,
+                self.corpus.domain.class_vars,
+                metas,
+            )
+            filtered = self.corpus.from_table(domain, self.corpus)
+            text_vars = [var for var in filtered.domain.metas if var.name in selected_var_names]
+            filtered.set_text_features(text_vars or None)
+            self.Outputs.corpus.send(filtered)
 
     def send_report(self):
         if self.corpus:
@@ -254,7 +331,8 @@ class OWIlPost(OWWidget):
                 (
                     ("Query", self.recent_queries[0]),
                     ("Content type", content_type.value if content_type else "All"),
-                    ("Max documents", self.max_documents),
+                    ("Max documents", self.MAX_DOCUMENTS_WITH_CONTENT if self.fetch_content else self.max_documents),
+                    ("Download full content", "Yes" if self.fetch_content else "No"),
                     ("Text includes", ", ".join(self.text_includes)),
                     ("Output", self.output_info or "Nothing"),
                 )

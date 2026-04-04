@@ -32,9 +32,9 @@ After installation, the **Il Post** category will appear in the Orange Canvas wi
 | **Date range** | Filter by *All time*, *Past year*, or *Past 30 days*. |
 | **Sort by** | Sort results by *Relevance*, *Newest*, or *Oldest*. |
 | **Category** | Optional editorial category filter (e.g. `politica`, `cultura`). Applies to articles only. |
-| **Max documents** | Maximum number of results to retrieve (10–1000). |
+| **Max documents** | Maximum number of results to retrieve (1–1000, capped at 100 when *Content* is selected). |
 | **Include paywalled content** | When unchecked, subscriber-only results are excluded. |
-| **Text includes** | Choose which fields are used as text features for analysis: *Title*, *Summary*, *Highlight*, *Category*, *Tags*. |
+| **Text includes** | Choose which fields are included in the output corpus and used as text features for analysis. Use **Select All** to check or uncheck all fields at once. Selecting *Content (max 100 articles)* also downloads the full article body (capped at 100 documents). |
 
 ### Output
 
@@ -44,6 +44,7 @@ The widget outputs a `Corpus` with the following metadata columns:
 |---|---|---|
 | Title | String | Article/episode title |
 | Summary | String | Short description |
+| Content | String | Full article body (only when *Content* is selected in Text includes) |
 | Highlight | String | Search snippet with matched terms |
 | Category | String | Editorial category |
 | Tags | String | Comma-separated topic tags |
@@ -51,6 +52,8 @@ The widget outputs a `Corpus` with the following metadata columns:
 | Publication Date | Time | Publication timestamp (Italian local time) |
 | URL | String | Link to the full content |
 | Relevance Score | Continuous | Search relevance score (0.0 when sorted by date) |
+
+Only the columns selected in **Text includes** appear in the output corpus (Publication Date and Relevance Score are always included).
 
 ### Example workflow
 
