@@ -179,12 +179,12 @@ class OWIlPost(OWWidget):
 
     def _on_fetch_content_changed(self):
         if self.fetch_content:
+            self.max_documents_spin.setMaximum(self.MAX_DOCUMENTS_WITH_CONTENT)
             self.max_documents = min(
                 self.max_documents, self.MAX_DOCUMENTS_WITH_CONTENT
             )
-            self.max_documents_spin.setDisabled(True)
         else:
-            self.max_documents_spin.setDisabled(False)
+            self.max_documents_spin.setMaximum(1000)
 
     def new_query_input(self):
         self.search.stop()
@@ -220,19 +220,13 @@ class OWIlPost(OWWidget):
         _, sort_order = SORT_ORDER_LABELS[self.sort_order_idx]
         category = self.filter_category.strip() or None
 
-        max_docs = (
-            self.MAX_DOCUMENTS_WITH_CONTENT
-            if self.fetch_content
-            else self.max_documents
-        )
-
         return self.api.search(
             self.recent_queries[0],
             content_type=content_type,
             date_range=date_range,
             sort=sort_order,
             category=category,
-            max_documents=max_docs,
+            max_documents=self.max_documents,
             include_paywalled=self.include_paywalled,
             fetch_content=self.fetch_content,
         )
@@ -266,14 +260,17 @@ class OWIlPost(OWWidget):
 
     def set_text_features(self):
         self.Warning.no_text_fields.clear()
-        if not self.text_includes:
+        if not self.text_includes and not self.fetch_content:
             self.Warning.no_text_fields()
 
         if self.corpus is not None:
+            selected = set(self.text_includes)
+            if self.fetch_content:
+                selected.add("Content")
             vars_ = [
                 var
                 for var in self.corpus.domain.metas
-                if var.name in self.text_includes
+                if var.name in selected
             ]
             self.corpus.set_text_features(vars_ or None)
             self.Outputs.corpus.send(self.corpus)
