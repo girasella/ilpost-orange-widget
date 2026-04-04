@@ -131,9 +131,9 @@ class OWIlPost(OWWidget):
             options_box,
             self,
             "max_documents",
-            minv=10,
+            minv=1,
             maxv=1000,
-            step=10,
+            step=1,
             label="Max documents:",
         )
 
