@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.1] - 2026-04-05
+
+### Fixed
+- Search would hang indefinitely in installed Orange when `ilpost-api-wrapper` was outdated — exceptions thrown in the background thread were silently swallowed by the `@asynchronous` decorator. Errors are now shown in the widget's error bar.
+- Added minimum version constraint `ilpost-api-wrapper>=0.4.0` so the Orange add-on manager upgrades the dependency automatically alongside the widget.
+
 ## [0.2.0] - 2026-04-05
 
 ### Added
