@@ -250,26 +250,30 @@ class OWIlPost(OWWidget):
 
     @asynchronous
     def search(self):
-        self.api = IlPostAPI(
-            on_progress=self.progress_with_info,
-            should_break=self.search.should_break,
-        )
+        try:
+            self.api = IlPostAPI(
+                on_progress=self.progress_with_info,
+                should_break=self.search.should_break,
+            )
 
-        _, content_type = CONTENT_TYPE_LABELS[self.content_type_idx]
-        _, date_range = DATE_RANGE_LABELS[self.date_range_idx]
-        _, sort_order = SORT_ORDER_LABELS[self.sort_order_idx]
-        category = self.filter_category.strip() or None
+            _, content_type = CONTENT_TYPE_LABELS[self.content_type_idx]
+            _, date_range = DATE_RANGE_LABELS[self.date_range_idx]
+            _, sort_order = SORT_ORDER_LABELS[self.sort_order_idx]
+            category = self.filter_category.strip() or None
 
-        return self.api.search(
-            self.recent_queries[0],
-            content_type=content_type,
-            date_range=date_range,
-            sort=sort_order,
-            category=category,
-            max_documents=self.max_documents,
-            include_paywalled=self.include_paywalled,
-            fetch_content=self.fetch_content,
-        )
+            return self.api.search(
+                self.recent_queries[0],
+                content_type=content_type,
+                date_range=date_range,
+                sort=sort_order,
+                category=category,
+                max_documents=self.max_documents,
+                include_paywalled=self.include_paywalled,
+                fetch_content=self.fetch_content,
+            )
+        except Exception as e:
+            self.Error.search_error(str(e))
+            raise
 
     @search.callback(should_raise=False)
     def progress_with_info(self, n_retrieved, n_all):
